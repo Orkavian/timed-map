@@ -1,7 +1,7 @@
 # timed-map
 
-Lightweight map implementation that supports expiring entries and fully
-compatible with both `std` and `no_std` environments.
+A map wrapper that adds expirable-entry support with as little overhead as possible,
+compatible with both std and no_std environments.
 
 `TimedMap` allows storing key-value pairs with optional expiration times. Expiration is
 handled by an implementation of the `Clock` trait, which abstracts time handling for
