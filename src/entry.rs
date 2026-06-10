@@ -70,7 +70,7 @@ impl<V> ExpirableEntry<V> {
     pub(crate) fn is_expired(&self, now_seconds: u64) -> bool {
         match self.status {
             EntryStatus::Constant => false,
-            EntryStatus::ExpiresAtSeconds(expires_at_seconds) => now_seconds > expires_at_seconds,
+            EntryStatus::ExpiresAtSeconds(expires_at_seconds) => now_seconds >= expires_at_seconds,
         }
     }
 
