@@ -602,7 +602,8 @@ where
     /// Clears the map, removing all elements.
     #[inline(always)]
     pub fn clear(&mut self) {
-        self.map.clear()
+        self.map.clear();
+        self.expiries.clear();
     }
 
     /// Returns an iterator over non-expired key-value pairs.
@@ -779,6 +780,23 @@ mod tests {
 
         assert_eq!(map.remove(&1), Some("constant value"));
         assert_eq!(map.get(&1), None);
+    }
+
+    #[test]
+    fn nostd_clear_removes_expiry_bookkeeping() {
+        let clock = MockClock { current_time: 1000 };
+        let mut map = TimedMap::new(clock);
+
+        map.insert_expirable(1, "expirable value", Duration::from_secs(60));
+
+        assert!(!map.expiries.is_empty());
+
+        map.clear();
+
+        assert!(map.expiries.is_empty());
+        assert_eq!(map.len(), 0);
+        assert_eq!(map.len_expired(), 0);
+        assert_eq!(map.len_unchecked(), 0);
     }
 
     #[test]
@@ -995,6 +1013,22 @@ mod std_tests {
 
         assert_eq!(map.get(&1), None);
         assert_eq!(map.get(&2), None);
+    }
+
+    #[test]
+    fn std_clear_removes_expiry_bookkeeping() {
+        let mut map = TimedMap::new();
+
+        map.insert_expirable(1, "expirable value", Duration::from_secs(60));
+
+        assert!(!map.expiries.is_empty());
+
+        map.clear();
+
+        assert!(map.expiries.is_empty());
+        assert_eq!(map.len(), 0);
+        assert_eq!(map.len_expired(), 0);
+        assert_eq!(map.len_unchecked(), 0);
     }
 
     #[test]
