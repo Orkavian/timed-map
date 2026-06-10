@@ -451,15 +451,51 @@ where
         self.map.len()
     }
 
-    /// Returns keys of the map
+    /// Returns keys for non-expired entries.
+    ///
+    /// To include expired entries as well, use [`TimedMap::keys_unchecked`].
     #[inline(always)]
     pub fn keys(&self) -> Vec<K> {
+        let now = self.clock.elapsed_seconds_since_creation();
+        self.map
+            .iter()
+            .filter(|(_k, v)| !v.is_expired(now))
+            .map(|(k, _v)| k.clone())
+            .collect()
+    }
+
+    /// Returns keys for expired entries.
+    #[inline(always)]
+    pub fn keys_expired(&self) -> Vec<K> {
+        let now = self.clock.elapsed_seconds_since_creation();
+        self.map
+            .iter()
+            .filter(|(_k, v)| v.is_expired(now))
+            .map(|(k, _v)| k.clone())
+            .collect()
+    }
+
+    /// Returns keys for all entries, including expired ones.
+    ///
+    /// To exclude expired entries, use [`TimedMap::keys`] instead.
+    #[inline(always)]
+    pub fn keys_unchecked(&self) -> Vec<K> {
         self.map.keys()
     }
 
-    /// Returns true if the map contains no elements.
+    /// Returns true if the map contains no non-expired elements.
+    ///
+    /// To include expired entries as well, use [`TimedMap::is_empty_unchecked`].
     #[inline(always)]
     pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    /// Returns true if the map contains no elements, regardless of expiration status.
+    ///
+    /// To exclude expired entries, use [`TimedMap::is_empty`] instead.
+    #[inline(always)]
+    pub fn is_empty_unchecked(&self) -> bool {
         self.map.is_empty()
     }
 
@@ -891,6 +927,30 @@ mod tests {
     }
 
     #[test]
+    fn nostd_keys_and_is_empty_ignore_expired_entries() {
+        let mut clock = MockClock { current_time: 1000 };
+        let mut map = TimedMap::new(clock);
+
+        map.insert_expirable(1, "expired value", Duration::from_secs(1));
+        map.insert_constant(2, "constant value");
+
+        clock.current_time = 1002;
+        map.clock = clock;
+
+        assert_eq!(map.keys().as_slice(), &[2]);
+        assert_eq!(map.keys_expired().as_slice(), &[1]);
+        assert_eq!(map.keys_unchecked().as_slice(), &[1, 2]);
+        assert!(!map.is_empty());
+        assert!(!map.is_empty_unchecked());
+
+        map.remove(&2);
+
+        assert!(map.is_empty());
+        assert_eq!(map.keys_expired().as_slice(), &[1]);
+        assert!(!map.is_empty_unchecked());
+    }
+
+    #[test]
     fn nostd_iter_empty() {
         let clock = MockClock { current_time: 1000 };
         let map: TimedMap<u64, &str, MockClock> = TimedMap::new(clock);
@@ -1184,6 +1244,28 @@ mod std_tests {
         map.insert_expirable(1, "expirable value", Duration::from_secs(1));
         std::thread::sleep(Duration::from_secs(2));
         assert!(map.contains_key_unchecked(&1));
+    }
+
+    #[test]
+    fn std_keys_and_is_empty_ignore_expired_entries() {
+        let mut map = TimedMap::new();
+
+        map.insert_expirable(1, "expired value", Duration::from_secs(1));
+        map.insert_constant(2, "constant value");
+
+        std::thread::sleep(Duration::from_secs(2));
+
+        assert_eq!(map.keys().as_slice(), &[2]);
+        assert_eq!(map.keys_expired().as_slice(), &[1]);
+        assert_eq!(map.keys_unchecked().as_slice(), &[1, 2]);
+        assert!(!map.is_empty());
+        assert!(!map.is_empty_unchecked());
+
+        map.remove(&2);
+
+        assert!(map.is_empty());
+        assert_eq!(map.keys_expired().as_slice(), &[1]);
+        assert!(!map.is_empty_unchecked());
     }
 
     #[test]
